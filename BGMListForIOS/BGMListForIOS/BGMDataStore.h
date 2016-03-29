@@ -14,6 +14,8 @@
 
 @property (nonatomic, weak) BGMTableViewController *nowTvc;
 @property (nonatomic, copy) NSArray *weekdayStrings;
+@property (nonatomic, copy) NSDictionary *siteChineseNameDic;
+@property (nonatomic, copy) NSArray *siteNameArray;
 
 + (instancetype)sharedStore;
 

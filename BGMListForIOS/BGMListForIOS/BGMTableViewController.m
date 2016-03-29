@@ -8,8 +8,17 @@
 
 #import "BGMTableViewController.h"
 #import "BGMBangumi.h"
+#import "BGMBangumiStore.h"
 #import "BGMDetailViewController.h"
 #import "BGMDataStore.h"
+#import "BGMTableViewCell.h"
+#import "AFNetworking.h"
+#import "UIImageView+AFNetworking.h"
+#import "BGMImageStore.h"
+#import "BGMHistoryViewController.h"
+#import "BGMNavigationController.h"
+
+#import "RESideMenu.h"
 
 #define kMaxX 100
 #define kYVelocityThreshold 100
@@ -32,7 +41,6 @@
     
     if (self) {
         [BGMDataStore sharedStore].nowTvc = self;
-        self.navigationItem.title = @"番组计划";
         _weekday = weekday;
         
         _translation = CGPointMake(0.0, 0.0);
@@ -46,12 +54,12 @@
                                             action:@selector(leftMenu)];
         self.navigationItem.leftBarButtonItem = changeDayButton;
         
-        UIPanGestureRecognizer *pgr =
-            [[UIPanGestureRecognizer alloc] initWithTarget:self
-                                                    action:@selector(pan:)];
-        pgr.delegate = self;
-        //pgr.cancelsTouchesInView = NO;
-        [self.tableView addGestureRecognizer:pgr];
+        UIBarButtonItem *historyButton =
+        [[UIBarButtonItem alloc] initWithTitle:@"历史番组"                                           style:UIBarButtonItemStyleDone
+                                        target:self
+                                        action:@selector(openHistoryMenu)];
+
+        self.navigationItem.rightBarButtonItem = historyButton;
         
     }
     
@@ -61,10 +69,26 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    [self.tableView removeFromSuperview];
+    //[self.tableView removeFromSuperview];
+    _timeTitle = [NSString stringWithFormat:@"%@年%@月番组",
+                  [BGMBangumiStore sharedStore].timeDic[@"year"],
+                  [BGMBangumiStore sharedStore].timeDic[@"month"]];
+    self.tableView.rowHeight = 150;
+    UINib *nib = [UINib nibWithNibName:@"BGMTableViewCell" bundle:nil];
     
-    [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"UITableViewCell"];
+    [self.tableView registerNib:nib forCellReuseIdentifier:@"BGMTableViewCell"];
+    //[self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"UITableViewCell"];
     self.tableView.tableFooterView = [[UIView alloc] initWithFrame:CGRectZero];
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    
+    UIBarButtonItem *backitem = [[UIBarButtonItem alloc] initWithTitle:@""
+                                                                 style:UIBarButtonItemStylePlain
+                                                                target:nil
+                                                                action:nil];
+    
+    self.navigationItem.backBarButtonItem = backitem;
+    
+    
 }
 
 - (void)didReceiveMemoryWarning {
@@ -86,9 +110,44 @@
 
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"UITableViewCell" forIndexPath:indexPath];
+    BGMTableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"BGMTableViewCell"
+                                                             forIndexPath:indexPath];
+    
+    static NSString *CellIdentifier = @"BGMTableViewCell";
+    cell.bgmImageView.image = nil;
     BGMBangumi *bgm = [BGMBangumiStore sharedStore].nowSeason.bgmOfWeekDay[self.weekday][indexPath.row];
-    cell.textLabel.text = bgm.titleCN;
+    cell.bgmName.text = bgm.titleCN;
+    NSInteger bgmId = bgm.bgmId;
+    cell.bgmImageView.tag = bgmId;
+    NSString *urlString = [NSString stringWithFormat:@"http://api.bgm.tv/subject/%ld?responseGroup=large", bgmId];
+    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+    UIImage *bgmImage = [[BGMImageStore sharedStore] imageForKey:bgm.bid];
+    if (!bgmImage) {
+        bgm.isLoadingImage = YES;
+        cell.bgmImageView.image = nil;
+        [manager GET:urlString
+          parameters:nil
+             success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+                 if ([responseObject isKindOfClass:[NSDictionary class]]) {
+                     NSLog(@"get json success");
+                     bgm.bgmDic = responseObject;
+                     NSString *imageUrlString = bgm.bgmDic[@"images"][@"large"];
+                     NSLog(@"%@",imageUrlString);
+                     NSURL *imageUrl = [NSURL URLWithString:imageUrlString];
+                     [self downloadImageWithURL:imageUrl ForCell:cell andBgm:bgm];
+                 }
+             }
+             failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+                 NSLog(@"Error: %@", error);
+             }];
+    } else {
+        UIImage *clipedImage = [self clipImage:bgmImage WithRect:cell.contentView.frame];
+        NSLog(@"cell Height: %f",cell.frame.origin.y);
+        NSLog(@"content Height: %f", cell.frame.origin.y);
+        NSLog(@"bgmImageView Height: %f", cell.bgmImageView.frame.origin.y);
+        cell.bgmImageView.image = clipedImage;
+        [cell.imageView setNeedsDisplay];
+    }
     
     return cell;
 }
@@ -100,67 +159,39 @@
     BGMBangumi *selectBgm = bgmList[indexPath.row];
     
     dvc.bangumi = selectBgm;
+    if(self.leftMendOpened) {
+        [self leftMenu];
+    }
     [self.navigationController pushViewController:dvc animated:YES];
     
 }
 
-/*
-// Override to support conditional editing of the table view.
-- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
-    // Return NO if you do not want the specified item to be editable.
-    return YES;
-}
-*/
-
-/*
-// Override to support editing the table view.
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (editingStyle == UITableViewCellEditingStyleDelete) {
-        // Delete the row from the data source
-        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-    } else if (editingStyle == UITableViewCellEditingStyleInsert) {
-        // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
-    }   
-}
-*/
-
-/*
-// Override to support rearranging the table view.
-- (void)tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)fromIndexPath toIndexPath:(NSIndexPath *)toIndexPath {
-}
-*/
-
-/*
-// Override to support conditional rearranging of the table view.
-- (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
-    // Return NO if you do not want the item to be re-orderable.
-    return YES;
-}
-*/
-
-/*
-#pragma mark - Navigation
-
-// In a storyboard-based application, you will often want to do a little preparation before navigation
-- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
-    // Get the new view controller using [segue destinationViewController].
-    // Pass the selected object to the new view controller.
-}
-*/
-
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    _timeTitle = [BGMBangumiStore sharedStore].nowSeason.timeTitle;
+    self.navigationItem.title = self.timeTitle;
     [self.tableView reloadData];
+    self.navigationController.navigationBar.barTintColor = [UIColor colorWithRed:41.0/255 green:187.0/255 blue:156.0/255 alpha:1];
+    [self.navigationController.navigationBar setTintColor:[UIColor whiteColor]];
+    [self.navigationController.navigationBar setTitleTextAttributes:@{NSForegroundColorAttributeName:[UIColor whiteColor]}];
+
+    
 }
 
 - (void)leftMenu {
     if (!self.leftMendOpened) {
-        self.moveFrameTo(100);
-        self.leftMendOpened = YES;
-    } else {
-        self.moveFrameTo(0);
+        //self.moveFrameTo(100);
+        [self.sideMenuViewController presentLeftMenuViewController];
+        
+        //self.leftMendOpened = YES;
+    }
+    /*
+    else {
+        //self.moveFrameTo(0);
+        [self.sideMenuViewController hideMenuViewController];
         self.leftMendOpened = NO;
     }
+     */
 
 }
 
@@ -212,6 +243,62 @@
     velocity.y = velocity.y > 0? velocity.y: -velocity.y;
     velocity.x = velocity.x > 0? velocity.x: -velocity.x;
     return velocity.y <= kYVelocityThreshold && velocity.x >= kXVelocityThreshold;
+}
+
+- (UIStatusBarStyle)preferredStatusBarStyle {
+    return UIStatusBarStyleLightContent;
+}
+
+
+- (void)downloadImageWithURL:(NSURL *)imageUrl ForCell:(BGMTableViewCell *)cell andBgm:(BGMBangumi *)bgm{
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:imageUrl];
+    [request addValue:@"image/*" forHTTPHeaderField:@"Accept"];
+    NSLog(@"Start Downlad Image");
+    [cell.bgmImageView setImageWithURLRequest:request
+                             placeholderImage:nil
+                                      success:^(NSURLRequest *request, NSHTTPURLResponse * _Nullable response, UIImage *image){
+                                          NSLog(@"Download Image Success");
+                                          
+                                          [[BGMImageStore sharedStore] setImage:image
+                                                                         forKey:bgm.bid];
+
+                                          UIImage *clipedImage = [self clipImage:image WithRect:cell.contentView.frame];
+                                          cell.bgmImageView.image = clipedImage;
+                                          [cell.bgmImageView setNeedsDisplay];
+                                          bgm.isLoadingImage = NO;
+                                          
+                                      }
+                                      failure:nil];
+    
+}
+
+- (UIImage *)clipImage:(UIImage *)image WithRect:(CGRect)rect{
+    CGSize originImageSize = image.size;
+    CGRect newRect = rect;
+    newRect.origin = CGPointMake(0, 0);
+    float ratio = MAX(newRect.size.height / originImageSize.height, newRect.size.width / originImageSize.width);
+    
+    UIGraphicsBeginImageContext(newRect.size);
+    
+    CGRect projectRect;
+    projectRect.size.width = ratio * originImageSize.width;
+    projectRect.size.height = ratio * originImageSize.height;
+    projectRect.origin.x = (newRect.size.width - projectRect.size.width) / 2.0;
+    projectRect.origin.y = (newRect.size.height - projectRect.size.height) / 2.0;
+    
+    [image drawInRect:projectRect];
+    
+    return UIGraphicsGetImageFromCurrentImageContext();
+}
+
+- (void)openHistoryMenu {
+    BGMHistoryViewController *hvc = [[BGMHistoryViewController alloc] initWithStyle:UITableViewStyleGrouped];
+    
+    BGMNavigationController *bnc = [[BGMNavigationController alloc] initWithRootViewController:hvc];
+    
+    [self presentViewController:bnc
+                       animated:YES
+                     completion:nil];
 }
 
 

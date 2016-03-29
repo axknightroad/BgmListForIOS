@@ -7,6 +7,9 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "UIViewController+RESideMenu.h"
+
+@class RESideMenu;
 
 @interface BGMLeftMenuViewController : UIViewController
 

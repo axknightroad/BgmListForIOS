@@ -14,6 +14,8 @@
 @property (nonatomic, strong) NSMutableArray *bgmOfWeekDay;
 @property (nonatomic, copy) void (^reloadBlock)(void);
 
-- (instancetype)initWithURL:(NSURL *)url andBlock:(void(^)(void))block;
+@property (nonatomic, copy) NSString *timeTitle;
+
+- (instancetype)initWithURL:(NSString *)url andBlock:(void(^)(void))block;
 
 @end

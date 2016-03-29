@@ -18,10 +18,11 @@
 @property (nonatomic, copy) void (^reloadBlock)(void);
 @property (nonatomic, copy) NSDictionary *timeDic;
 @property (nonatomic, weak) BGMTableViewController *tvc;
+@property (nonatomic, readonly) NSArray *historySeasons;
 
 
 + (instancetype)sharedStore;
-- (BOOL)setSeason:(NSString *)season;
+- (BOOL)setSeasonWithYear:(NSString *)year andMonth:(NSString *)month;
 
 
 @end

@@ -26,6 +26,9 @@
         _newBgm = [dic[@"newBgm"]isEqualToNumber:@1]? YES: NO;
         _bgmId = [(NSNumber *)dic[@"bgmId"] integerValue];
         _showDate = dic[@"showDate"];
+        
+        _isLoadingImage = NO;
+        _isLoadingInfo = NO;
     }
     
     return self;

@@ -105,5 +105,10 @@
     [self.dictionary removeAllObjects];
 }
 
+- (void)clear {
+    NSLog(@"flushing %d images out of cache", [self.dictionary count]);
+    [self.dictionary removeAllObjects];
+}
+
 
 @end

@@ -9,10 +9,13 @@
 #import "BGMSeason.h"
 #import "BGMDataStore.h"
 #import "BGMTableViewController.h"
+#import "AFNetworking.h"
+
+@class AFHTTPSessionManager;
 
 @implementation BGMSeason
 
-- (instancetype)initWithURL:(NSURL *)url andBlock:(void (^)(void))block
+- (instancetype)initWithURL:(NSString *)url andBlock:(void (^)(void))block
 {
     self = [super init];
     if (self) {
@@ -23,7 +26,7 @@
             NSMutableArray *weekday = [[NSMutableArray alloc] init];
             [_bgmOfWeekDay addObject:weekday];
         }
-        
+        /*
         NSURLSessionConfiguration *config =
         [NSURLSessionConfiguration defaultSessionConfiguration];
         NSURLSession *session = [NSURLSession sessionWithConfiguration:config
@@ -51,6 +54,31 @@
                                               });
                                           }];
         [dataTask resume];
+         */
+        AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+        [manager GET:url
+          parameters:nil
+             success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+                 NSDictionary *allBgm = responseObject;
+                 for (NSString *key in allBgm) {
+                     BGMBangumi *bgm = [[BGMBangumi alloc] initWithDic:allBgm[key] andBid:key];
+                     [_bgmOfWeekDay[7] addObject:bgm];
+                     [_bgmOfWeekDay[bgm.weekDayCN] addObject:bgm];
+                 }
+                 
+                 while (![BGMDataStore sharedStore].nowTvc) {
+                 }
+                 
+                 dispatch_async(dispatch_get_main_queue(), ^{
+                     [[BGMDataStore sharedStore].nowTvc.tableView reloadData];
+                 });
+
+             } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+                 NSLog(@"Error:%@", error);
+             }
+         ];
+        
+        
     }
     return self;
 }

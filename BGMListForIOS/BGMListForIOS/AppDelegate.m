@@ -11,6 +11,9 @@
 #import "BGMTableViewController.h"
 #import "BGMLeftMenuViewController.h"
 #import "BGMDataStore.h"
+#import "BGMNavigationController.h"
+#import "BGMViewController.h"
+#import "RESideMenu.h"
 
 @interface AppDelegate ()
 
@@ -22,20 +25,23 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     
-    NSInteger weekday = [[BGMBangumiStore sharedStore].timeDic[@"weekday"] integerValue];
+    [[UIApplication sharedApplication] setStatusBarStyle:UIStatusBarStyleLightContent];  
     
-    BGMTableViewController *tvc = [[BGMTableViewController alloc] initWithStyle:UITableViewStylePlain andWeekday:weekday];
+    NSInteger today = [[BGMBangumiStore sharedStore].timeDic[@"weekday"] integerValue];
     
-    __weak BGMTableViewController *weakTvc = tvc;
-    UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:tvc];
+    BGMTableViewController *tvc = [[BGMTableViewController alloc] initWithStyle:UITableViewStylePlain andWeekday:today];
+    
+    
+    BGMNavigationController *navController = [[BGMNavigationController alloc] initWithRootViewController:tvc];
     
     BGMLeftMenuViewController *lvc = [[BGMLeftMenuViewController alloc] init];
+    
     
 
     
     
     
-    __weak UINavigationController *weakNc = navController;
+    __weak BGMNavigationController *weakNc = navController;
 //    __weak BGMLeftMenuViewController *weakLvc = lvc;
     
     tvc.moveFrameTo = ^(CGFloat x){
@@ -50,13 +56,13 @@
         [UIView commitAnimations];
     };
     
-    
+    __weak BGMTableViewController *weakTvc = tvc;
     lvc.changWeekdayBlock = ^(NSInteger weekday){
         weakTvc.weekday = weekday;
         weakTvc.navigationItem.leftBarButtonItem.title = [BGMDataStore sharedStore].weekdayStrings[weekday];
         [weakTvc.tableView reloadData];
         weakTvc.leftMendOpened = NO;
-
+        /*
         CGRect frame = weakNc.view.frame;
         [UIView beginAnimations:@"Move" context:nil];
         [UIView setAnimationDuration:0.2];
@@ -64,9 +70,11 @@
         frame.origin.x = 0;
         weakNc.view.frame = frame;
         [UIView commitAnimations];
+         */
     };
     
-    UIViewController *rvc = [[UIViewController alloc] init];
+    /* 原来的rootViewController
+    BGMViewController *rvc = [[BGMViewController alloc] init];
     self.window.rootViewController = rvc;
     
     [rvc addChildViewController:lvc];
@@ -74,6 +82,14 @@
     [rvc addChildViewController:navController];
     [rvc.view addSubview:tvc.view];
     [rvc.view addSubview:navController.view];
+    */
+    
+    RESideMenu *rootSideMenuViewController =
+    [[RESideMenu alloc] initWithContentViewController:navController
+                               leftMenuViewController:lvc
+                              rightMenuViewController:nil];
+    
+    self.window.rootViewController = rootSideMenuViewController;
     
     
     self.window.backgroundColor = [UIColor whiteColor];
@@ -104,5 +120,6 @@
 - (void)applicationWillTerminate:(UIApplication *)application {
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
 }
+
 
 @end

@@ -8,8 +8,12 @@
 
 #import "BGMLeftMenuViewController.h"
 #import "BGMBangumiStore.h"
+#import "BGMImageStore.h"
+
+#import "RESideMenu.h"
 
 @interface BGMLeftMenuViewController ()
+
 
 @end
 
@@ -24,7 +28,11 @@
     
     self.selectButton = buttons[weekday];
     self.selectButton.selected = YES;
+    [self.selectButton setTitle:@"今天" forState:UIControlStateNormal];
+    [self.selectButton setTitle:@"今天" forState:UIControlStateSelected];
+    
 }
+
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
@@ -37,7 +45,16 @@
     selectButton.selected = YES;
     self.selectButton = selectButton;
     self.changWeekdayBlock(weekday);
+    [self.sideMenuViewController hideMenuViewController];
 }
+- (IBAction)clearImageCache:(id)sender {
+    [[BGMImageStore sharedStore] clear];
+}
+
+- (UIStatusBarStyle)preferredStatusBarStyle {
+    return UIStatusBarStyleLightContent;
+}
+
 
 /*
 #pragma mark - Navigation

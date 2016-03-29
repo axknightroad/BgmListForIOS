@@ -23,6 +23,10 @@
 @property (nonatomic) BOOL newBgm;
 @property (nonatomic) NSInteger bgmId;
 @property (nonatomic, copy) NSString *showDate;
+@property (nonatomic, copy) NSDictionary *bgmDic;
+
+@property BOOL isLoadingImage;
+@property BOOL isLoadingInfo;
 
 
 - (instancetype)initWithDic:(NSDictionary *)dic andBid:(NSString *)bid;

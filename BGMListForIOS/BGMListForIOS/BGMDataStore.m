@@ -36,6 +36,23 @@
     if (self) {
         _weekdayStrings = @[@"周日", @"周一", @"周二", @"周三",
                             @"周四", @"周五", @"周六", @"所有"];
+        _siteNameArray = @[@"acfun", @"bilibili", @"tucao", @"sohu", @"youku",
+                           @"qq", @"iqiyi", @"letv", @"pptv", @"tudou", @"movie"];
+        
+        _siteChineseNameDic = @{
+                         @"acfun": @"A站",
+                         @"bilibili": @"B站",
+                         @"tucao": @"C站",
+                         @"sohu": @"搜狐",
+                         @"youku": @"优酷",
+                         @"qq": @"腾讯",
+                         @"iqiyi": @"爱奇艺",
+                         @"letv": @"乐视",
+                         @"pptv": @"PPTV",
+                         @"tudou": @"土豆",
+                         @"movie": @"迅雷",
+                         @"other": @"其他"
+                         };
         
     }
     

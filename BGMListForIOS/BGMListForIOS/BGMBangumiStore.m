@@ -7,6 +7,10 @@
 //
 
 #import "BGMBangumiStore.h"
+#import "BGMDataStore.h"
+#import "AFNetworking.h"
+
+@class AFHTTPSessionManager;
 
 @interface BGMBangumiStore ()
 
@@ -14,7 +18,9 @@
 @property (nonatomic) NSURLSession *session;
 @property (nonatomic) NSString *baseURLString;
 @property (nonatomic) NSString *archiveAppendingString;
-@property (nonatomic) NSDictionary *archiveDictionary;
+@property (nonatomic, copy) NSMutableArray *priviateHistory;
+@property (nonatomic, copy) NSDictionary *archiveDictionary;
+
 
 @end
 
@@ -45,6 +51,7 @@
         _timeDic = [self getYearAndMonthAndWeekday];
         _baseURLString = @"http://bgmlist.com/";
         _archiveAppendingString = @"json/archive.json";
+        _priviateHistory = [[NSMutableArray alloc] init];
 
         [self fetchFeed];
     }
@@ -56,14 +63,14 @@
     @throw [NSException exceptionWithName:@"Singleton" reason:@"Use +[BGMBangumiStore sharedStore]" userInfo:nil];
 }
 
-- (BOOL)setSeason:(NSString *)season {
-    self.nowSeason = self.priviateSeason[season];
-    
-    if (self.nowSeason) {
-        return YES;
+- (BOOL)setSeasonWithYear:(NSString *)year andMonth:(NSString *)month; {
+    if (!self.priviateSeason[year] || !self.priviateSeason[year][month]) {
+        [self fetchFeedWithYear:year andMonth:month];
     }
     
-    return NO;
+    self.nowSeason = self.priviateSeason[year][month];
+    
+    return YES;
 }
 
 - (NSDictionary *)allSeason {
@@ -71,30 +78,102 @@
 }
 
 - (void)fetchFeed {
+
     NSString *archiveURLstring = [self.baseURLString stringByAppendingString:self.archiveAppendingString];
-    NSURL *url = [NSURL URLWithString:archiveURLstring];
-    NSURLRequest *req = [NSURLRequest requestWithURL:url];
-    NSURLSessionDataTask *dataTask = [self.session dataTaskWithRequest:req
-                                                     completionHandler:
-                                      ^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
-                                          self.archiveDictionary =
-                                          [NSJSONSerialization JSONObjectWithData:data
-                                                                          options:0
-                                                                            error:nil];
-                                          NSString *path = self.archiveDictionary[@"data"][self.timeDic[@"year"]][self.timeDic[@"month"]][@"path"];
-                                          NSString *thisSeasonURLsrting = [self.baseURLString stringByAppendingString:path];
-                                          NSURL *thisSeasonURL = [NSURL URLWithString:thisSeasonURLsrting];
-                                          
-                                          BGMSeason *thisSeason = [[BGMSeason alloc] initWithURL:thisSeasonURL andBlock:self.reloadBlock];
-                                          NSMutableDictionary *bgmSeasonDic = [[NSMutableDictionary alloc] init];
-                                          bgmSeasonDic[self.timeDic[@"month"]] = thisSeason;
-                                          self.priviateSeason[self.timeDic[@"year"]] = bgmSeasonDic;
-                                          self.nowSeason = thisSeason;
-                                      }];
-    [dataTask resume];
+    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+    [manager GET:archiveURLstring
+      parameters:nil
+         success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+             if ([responseObject isKindOfClass:[NSDictionary class]]) {
+                 NSLog(@"Success load JSON data");
+                 self.archiveDictionary = responseObject;
+                 
+                 for (NSString *year in self.archiveDictionary[@"data"]) {
+                     NSMutableArray *thisYeay = [[NSMutableArray alloc] init];
+                     [thisYeay addObject:year];
+                     for (NSString *month in self.archiveDictionary[@"data"][year]) {
+                         [thisYeay addObject:month];
+                     }
+                     [thisYeay sortUsingComparator:^NSComparisonResult(id  _Nonnull obj1, id  _Nonnull obj2) {
+                         NSInteger m1 = [obj1 integerValue];
+                         NSInteger m2 = [obj2 integerValue];
+                         if (m1 > 1000) {
+                             return NSOrderedAscending;
+                         } else if(m2 > 1000) {
+                             return NSOrderedDescending;
+                         } else {
+                             if (m1 > m2) {
+                                 return NSOrderedDescending;
+                             } else if (m1 == m2) {
+                                 return NSOrderedSame;
+                             } else {
+                                 return NSOrderedAscending;
+                             }
+                         }
+                     }];
+                     [self.priviateHistory addObject:thisYeay];
+                 }
+                 
+                 [self.priviateHistory sortUsingComparator:^NSComparisonResult(id  _Nonnull obj1, id  _Nonnull obj2) {
+                     NSArray *y1 = obj1;
+                     NSArray *y2 = obj2;
+                     NSInteger y1m = [y1[0] integerValue];
+                     NSInteger y2m = [y2[0] integerValue];
+                     if (y1m > y2m) {
+                         return NSOrderedDescending;
+                     } else if (y1m == y2m) {
+                         return NSOrderedSame;
+                     } else {
+                         return NSOrderedAscending;
+                     }
+                 }];
+                 
+                 NSString *path = self.archiveDictionary[@"data"][self.timeDic[@"year"]][self.timeDic[@"month"]][@"path"];
+                 NSString *thisSeasonURLsrting = [self.baseURLString stringByAppendingString:path];
+                 
+                 BGMSeason *thisSeason = [[BGMSeason alloc] initWithURL:thisSeasonURLsrting
+                                                               andBlock:self.reloadBlock];
+                 thisSeason.timeTitle = [NSString stringWithFormat:@"%@年%@月番组",
+                                         self.timeDic[@"year"],
+                                         self.timeDic[@"month"]];
+                 UITableViewController *nowTvc =  [BGMDataStore sharedStore].nowTvc;
+                 nowTvc.navigationItem.title = thisSeason.timeTitle;
+                 
+                 NSMutableDictionary *bgmSeasonDic = [[NSMutableDictionary alloc] init];
+                 bgmSeasonDic[self.timeDic[@"month"]] = thisSeason;
+                 self.priviateSeason[self.timeDic[@"year"]] = bgmSeasonDic;
+                 self.nowSeason = thisSeason;
+
+             }
+         } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+              NSLog(@"Error: %@", error);
+         }
+     ];
 
     
 }
+
+- (void)fetchFeedWithYear:(NSString *)year andMonth:(NSString *)month {
+    NSString *path = self.archiveDictionary[@"data"][year][month][@"path"];
+    NSString *thisSeasonURLsrting = [self.baseURLString stringByAppendingString:path];
+    
+    BGMSeason *thisSeason = [[BGMSeason alloc] initWithURL:thisSeasonURLsrting
+                                                  andBlock:self.reloadBlock];
+    thisSeason.timeTitle = [NSString stringWithFormat:@"%@年%@月番组",
+                            year,
+                            month];
+    
+    NSMutableDictionary *bgmYearDic = self.priviateSeason[year];
+    if (!bgmYearDic) {
+        bgmYearDic = [[NSMutableDictionary alloc] init];
+        self.priviateSeason[year] = bgmYearDic;
+
+    }
+    bgmYearDic[month] = thisSeason;
+    self.nowSeason = thisSeason;
+
+    
+};
 
 - (NSDictionary *)getYearAndMonthAndWeekday {
     NSDateComponents *components = [[NSCalendar currentCalendar] components:NSCalendarUnitMonth | NSCalendarUnitYear | NSWeekdayCalendarUnit fromDate:[NSDate date]];
@@ -132,7 +211,9 @@
     return yearDic;
 }
 
-
+- (NSArray *)historySeasons {
+    return (NSArray *)self.priviateHistory;
+}
 
 
 @end
